@@ -47,8 +47,33 @@
 #include <QBuffer>
 
 #include <QVariant>
+
+#include <QMap>
+#include <QThread>
+
+#include <QPainter>
+
+#include "worker.h"
+
+const QMap<QString, QString> emo_map
+{
+    {"angry", "愤怒"},
+    {"disgust", "厌恶"},
+    {"fear", "恐惧"},
+    {"happy", "高兴"},
+    {"angry", "伤心"},
+    {"surprise", "惊讶"},
+    {"neutral", "无表情"},
+    {"happy", "撅嘴"},
+    {"grimace", "鬼脸"}
+};
+
+
 QT_BEGIN_NAMESPACE
-namespace Ui { class Widget; }
+namespace Ui
+{
+    class Widget;
+}
 QT_END_NAMESPACE
 
 class Widget : public QWidget
@@ -63,26 +88,34 @@ public slots:
     void takePicture();
     void tokenReply(QNetworkReply *reply);
     void imgReply(QNetworkReply *reply);
-    void beginFaceDetect();
+    void beginFaceDetect(QByteArray postData);
+    void preparePostData();
 private:
     Ui::Widget *ui;
 
     QCamera *m_camera;
-    QCameraViewfinder* m_viewfinder;
-    QCameraImageCapture* m_imageCapture;
+    QCameraViewfinder *m_viewfinder;
+    QCameraImageCapture *m_imageCapture;
 
-    QHBoxLayout* m_hLayout;
-    QVBoxLayout* m_vLayout_l,*m_vLayout_r;
+    QHBoxLayout *m_hLayout;
+    QVBoxLayout *m_vLayout_l, *m_vLayout_r;
 
-    QTimer* m_refreshTimer;
-    QNetworkAccessManager* m_tokenManager;
-    QNetworkAccessManager* m_imgManager;
-    QUrl* m_url;
-    QUrlQuery* m_query;
+    QTimer *m_refreshTimer;
+    QNetworkAccessManager *m_tokenManager;
+    QNetworkAccessManager *m_imgManager;
+    QUrl *m_url;
+    QUrlQuery *m_query;
     QSslConfiguration m_sslConfig;
-    QNetworkRequest* m_networkReq;
-    QString m_access_token="";
+    QNetworkRequest *m_networkReq;
+    QString m_access_token = "";
     QImage m_img;
 
+    QThread *m_childThread;
+
+    double m_left, m_top, m_width, m_height;
+
+
+signals:
+    void beginWork(QImage img);
 };
 #endif // WIDGET_H

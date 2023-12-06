@@ -7,22 +7,21 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    //设置摄像头功能
+    // 设置摄像头功能
     m_camera = new QCamera;
     m_viewfinder = new QCameraViewfinder;
     m_imageCapture = new QCameraImageCapture(m_camera);
-
 
     m_viewfinder->show();
     m_camera->setViewfinder(m_viewfinder);
 
 
-    m_camera->setCaptureMode(QCamera::CaptureStillImage); //静态图片
+    m_camera->setCaptureMode(QCamera::CaptureStillImage); // 静态图片
     m_imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToFile);
     m_camera->start();
 
     connect(m_imageCapture, &QCameraImageCapture::imageCaptured, this, &Widget::showCameraImage);
-    connect(ui->pushButton, &QPushButton::clicked, this, &Widget::beginFaceDetect);
+    connect(ui->pushButton, &QPushButton::clicked, this, &Widget::preparePostData);
 
     // 布局
     this->setMaximumSize(MAINWIN_H, MAINWIN_W);
@@ -42,11 +41,11 @@ Widget::Widget(QWidget *parent)
     m_hLayout->addLayout(m_vLayout_r);
     this->setLayout(m_hLayout);
 
-    ui->label->setScaledContents(true); //缩放
+    ui->label->setScaledContents(true); // 缩放
     ui->label->setMinimumSize(LABEL_H, LABEL_W);
     ui->label->setMaximumSize(LABEL_H, LABEL_W);
 
-    //利用定时器，不断拍照
+    // 利用定时器，不断拍照
     m_refreshTimer = new QTimer;
     connect(m_refreshTimer, &QTimer::timeout, this, &Widget::takePicture);
     m_refreshTimer->start(TIME_OUT);
@@ -65,7 +64,7 @@ Widget::Widget(QWidget *parent)
     m_query->addQueryItem("grant_type", "client_credentials");
 
     m_url->setQuery(*m_query);
-    qDebug() << m_url->url();
+    // qDebug() << m_url->url();
 
 
     // 配置ssl
@@ -96,7 +95,13 @@ void Widget::showCameraImage(int id, QImage preview)
 {
     Q_UNUSED(id);
     m_img = preview;
-    ui->label->setPixmap(QPixmap::fromImage(preview));
+    // 绘制人脸
+
+    QPainter painter(&m_img);
+    painter.setPen(Qt::red);
+    painter.drawRect(m_left, m_top, m_width, m_height);
+
+    ui->label->setPixmap(QPixmap::fromImage(m_img));
 }
 
 void Widget::takePicture()
@@ -136,7 +141,8 @@ void Widget::tokenReply(QNetworkReply *reply)
         qDebug() << "Json error  = " << jsonError.errorString();
     }
 
-
+    reply->deleteLater();
+    preparePostData();
 }
 
 void Widget::imgReply(QNetworkReply *reply)
@@ -163,15 +169,38 @@ void Widget::imgReply(QNetworkReply *reply)
         QJsonObject obj = doc.object();
         if(obj.contains("result"))
         {
-            //  人脸列表
+            // 人脸列表
             QJsonObject result_obj = obj.take("result").toObject();
             if(result_obj.contains("face_list"))
             {
                 QJsonArray face_list_array = result_obj.take("face_list").toArray();
 
-                //第一张人脸
+                // 第一张人脸
                 QJsonObject face_obj = face_list_array.at(0).toObject();
 
+
+                // 取出人脸信息
+                if(face_obj.contains("location"))
+                {
+                    QJsonObject location_obj = face_obj.take("location").toObject();
+                    if(location_obj.contains("left"))
+                    {
+                        m_left = location_obj.take("left").toDouble();
+                    }
+                    if(location_obj.contains("top"))
+                    {
+                        m_top = location_obj.take("top").toDouble();
+                    }
+                    if(location_obj.contains("width"))
+                    {
+                        m_width = location_obj.take("width").toDouble();
+                    }
+                    if(location_obj.contains("height"))
+                    {
+                        m_height = location_obj.take("height").toDouble();
+                    }
+                    // qDebug() << m_left << m_top << m_width << m_height;
+                }
                 // 年龄
                 if(face_obj.contains("age"))
                 {
@@ -198,7 +227,7 @@ void Widget::imgReply(QNetworkReply *reply)
                     if(emotion_obj.contains("type"))
                     {
                         QString emotion = emotion_obj.take("type").toString();
-                        face_info.append("表情:").append(emotion).append("\r\n");
+                        face_info.append("表情:").append(emo_map[emotion]).append("\r\n");
                     }
                 }
 
@@ -223,44 +252,25 @@ void Widget::imgReply(QNetworkReply *reply)
             }
 
         }
-        qDebug() << face_info;
+        // qDebug() << face_info;
         ui->textBrowser->setText(face_info);
     }
     else
     {
         qDebug() << "Json error  = " << jsonError.errorString();
     }
+
+    reply->deleteLater();
+    preparePostData();
 }
 
 
-void Widget::beginFaceDetect()
+void Widget::beginFaceDetect(QByteArray postData)
 {
-    //图片tobs64编码
-    QByteArray ba;
-    QBuffer buffer(&ba);
-    //buffer.open(QIODevice::WriteOnly);
-    m_img.save(&buffer, "PNG"); // writes image into ba in PNG format
-    QString bs64Str = ba.toBase64();
-    if(bs64Str.isEmpty())
-    {
-        qDebug() << "bs64Str is empty";
-    }
-    else
-    {
-        qDebug() << "bs64Str is not empty";
-    }
-    buffer.close();
 
-    // 请求体body参数设置
-    QJsonObject postJson;
-    QJsonDocument doc;
-    postJson.insert("image", bs64Str);
-    postJson.insert("image_type", "BASE64");
-    postJson.insert("face_field", "age,expression,face_shape,gender,glasses,eye_status,emotion,face_type,mask,beauty");
-
-    doc.setObject(postJson);
-    QByteArray postData = doc.toJson(QJsonDocument::Compact);
-
+    // 另一个槽函数
+    // 关闭子线程
+    m_childThread->exit();
 
     // 组装请求
     m_url->setUrl(FACEDETECTSTR);
@@ -274,5 +284,27 @@ void Widget::beginFaceDetect()
     m_networkReq->setSslConfiguration(m_sslConfig);
 
     m_imgManager->post(*m_networkReq, postData);
+}
+
+void Widget::preparePostData()
+{
+    // 创建线程
+    m_childThread = new QThread(this);
+
+    // 创建工人
+    Worker *worker = new Worker;
+
+    // 把工人送入子线程
+    worker->moveToThread(m_childThread);
+
+    connect(m_childThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(this, &Widget::beginWork, worker, &Worker::doWork);
+    connect(worker, &Worker::resultReady, this, &Widget::beginFaceDetect);
+
+    // 启动子线程
+    m_childThread->start();
+
+    // 给工人发通知干活
+    emit beginWork(m_img);
 }
 
