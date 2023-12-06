@@ -9,6 +9,10 @@
 
 #define TIME_OUT 10
 
+#define FACEDETECTSTR "https://aip.baidubce.com/rest/2.0/face/v3/detect"
+#define TOKENSTR "https://aip.baidubce.com/oauth/2.0/token"
+
+
 #include <QWidget>
 #include <QDebug>
 
@@ -38,6 +42,11 @@
 #include <QJsonValue>
 #include <QJsonObject>
 
+
+#include <QImage>
+#include <QBuffer>
+
+#include <QVariant>
 QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
 QT_END_NAMESPACE
@@ -53,6 +62,8 @@ public slots:
     void showCameraImage(int id, QImage preview);
     void takePicture();
     void tokenReply(QNetworkReply *reply);
+    void imgReply(QNetworkReply *reply);
+    void beginFaceDetect();
 private:
     Ui::Widget *ui;
 
@@ -65,13 +76,13 @@ private:
 
     QTimer* m_refreshTimer;
     QNetworkAccessManager* m_tokenManager;
+    QNetworkAccessManager* m_imgManager;
     QUrl* m_url;
     QUrlQuery* m_query;
-    QSslConfiguration sslConfig;
+    QSslConfiguration m_sslConfig;
     QNetworkRequest* m_networkReq;
-    QByteArray replyData;
-    QString m_access_token;
-
+    QString m_access_token="";
+    QImage m_img;
 
 };
 #endif // WIDGET_H
