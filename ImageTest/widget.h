@@ -9,15 +9,16 @@
 
 #define TIME_OUT 10
 #define NET_TIME_OUT 1500
+#define GAME_TIME_OUT 1000
 
 #define TEXTOFFSET 10
 
 #define TOKENSTR "https://aip.baidubce.com/oauth/2.0/token"
 
-#define FACE_CLIENT_ID "hB1Sp4HeAGGBD95RKVCf9v07"
-#define FACE_CLIENT_SECRET "MpnkvHtKxP7OMyIvFRAGPyLIZOhXlRqp"
-#define FACE_CONTENT_TYPE_HEADER "application/json"
-#define FACE_DETECT_URL "https://aip.baidubce.com/rest/2.0/face/v3/detect"
+#define BODY_CLIENT_ID "mpruaotidybWNpNkrG6dE7k7"
+#define BODY_CLIENT_SECRET "Ybo5PVGuuvFg78DmxFYnURMnvlO0Gl3k"
+#define BODY_CONTENT_TYPE_HEADER "application/x-www-form-urlencoded"
+#define BODY_DETECT_URL "https://aip.baidubce.com/rest/2.0/image-classify/v1/gesture"
 
 
 #include <QWidget>
@@ -63,6 +64,7 @@
 #include <QCameraInfo>
 #include <QComboBox>
 
+#include <QRandomGenerator>
 
 #include "worker.h"
 
@@ -102,6 +104,8 @@ public slots:
     void beginFaceDetect(QByteArray postData, QThread *childThread);
     void preparePostData();
     void pickCamera(int index);
+    void beginGame();
+    void analysGame();
 private:
     Ui::Widget *ui;
 
@@ -112,7 +116,7 @@ private:
     QHBoxLayout *m_hLayout;
     QVBoxLayout *m_vLayout_l, *m_vLayout_r;
 
-    QTimer *m_refreshTimer, *m_netTimer;
+    QTimer *m_refreshTimer, *m_netTimer, *m_gameTimer;
     QNetworkAccessManager *m_tokenManager;
     QNetworkAccessManager *m_imgManager;
     QUrl *m_url;
@@ -132,6 +136,10 @@ private:
     QList<QCameraInfo> m_cameraList;
     int m_cur_timestamp;
 
+    int m_game_count ;
+    QString m_game_str;
+
+    int m_com_hand, m_u_hand;
 
 signals:
     void beginWork(QImage img, QThread *childThread);
