@@ -8,11 +8,16 @@
 #define LABEL_W 500
 
 #define TIME_OUT 10
+#define NET_TIME_OUT 1500
 
 #define TEXTOFFSET 10
 
-#define FACEDETECTSTR "https://aip.baidubce.com/rest/2.0/face/v3/detect"
 #define TOKENSTR "https://aip.baidubce.com/oauth/2.0/token"
+
+#define FACE_CLIENT_ID "hB1Sp4HeAGGBD95RKVCf9v07"
+#define FACE_CLIENT_SECRET "MpnkvHtKxP7OMyIvFRAGPyLIZOhXlRqp"
+#define FACE_CONTENT_TYPE_HEADER "application/json"
+#define FACE_DETECT_URL "https://aip.baidubce.com/rest/2.0/face/v3/detect"
 
 
 #include <QWidget>
@@ -94,7 +99,7 @@ public slots:
     void takePicture();
     void tokenReply(QNetworkReply *reply);
     void imgReply(QNetworkReply *reply);
-    void beginFaceDetect(QByteArray postData);
+    void beginFaceDetect(QByteArray postData, QThread *childThread);
     void preparePostData();
     void pickCamera(int index);
 private:
@@ -107,7 +112,7 @@ private:
     QHBoxLayout *m_hLayout;
     QVBoxLayout *m_vLayout_l, *m_vLayout_r;
 
-    QTimer *m_refreshTimer;
+    QTimer *m_refreshTimer, *m_netTimer;
     QNetworkAccessManager *m_tokenManager;
     QNetworkAccessManager *m_imgManager;
     QUrl *m_url;
@@ -125,9 +130,10 @@ private:
     QString m_gender;
 
     QList<QCameraInfo> m_cameraList;
+    int m_cur_timestamp;
 
 
 signals:
-    void beginWork(QImage img);
+    void beginWork(QImage img, QThread *childThread);
 };
 #endif // WIDGET_H

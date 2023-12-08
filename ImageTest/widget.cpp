@@ -66,6 +66,11 @@ Widget::Widget(QWidget *parent)
     connect(m_refreshTimer, &QTimer::timeout, this, &Widget::takePicture);
     m_refreshTimer->start(TIME_OUT);
 
+    // 定时器不断进行人脸识别请求
+    m_netTimer = new QTimer;
+    connect(m_netTimer, &QTimer::timeout, this, &Widget::preparePostData);
+
+
     m_tokenManager = new QNetworkAccessManager(this);
     m_imgManager = new QNetworkAccessManager(this);
     qDebug() << m_tokenManager->supportedSchemes();
@@ -75,8 +80,8 @@ Widget::Widget(QWidget *parent)
     m_url->setUrl(TOKENSTR);
 
     m_query = new QUrlQuery;
-    m_query->addQueryItem("client_id", "hB1Sp4HeAGGBD95RKVCf9v07");
-    m_query->addQueryItem("client_secret", "MpnkvHtKxP7OMyIvFRAGPyLIZOhXlRqp");
+    m_query->addQueryItem("client_id", FACE_CLIENT_ID);
+    m_query->addQueryItem("client_secret",  FACE_CLIENT_SECRET);
     m_query->addQueryItem("grant_type", "client_credentials");
 
     m_url->setQuery(*m_query);
@@ -147,6 +152,7 @@ void Widget::tokenReply(QNetworkReply *reply)
     // 正确应答
     QByteArray replyData = reply->readAll();
     // qDebug()<<replyData;
+    // qDebug() << "reply token...";
 
     // json 解析
     QJsonParseError jsonError;
@@ -167,8 +173,9 @@ void Widget::tokenReply(QNetworkReply *reply)
     }
 
     reply->deleteLater();
+    m_netTimer->start(NET_TIME_OUT);
 
-    preparePostData();
+    // preparePostData();
 }
 
 void Widget::imgReply(QNetworkReply *reply)
@@ -182,7 +189,8 @@ void Widget::imgReply(QNetworkReply *reply)
 
     // 正确应答
     QByteArray replyData = reply->readAll();
-    // qDebug() << replyData;
+    qDebug() << replyData;
+
 
     QJsonParseError jsonError;
     QJsonDocument doc = QJsonDocument::fromJson(replyData, &jsonError);
@@ -193,6 +201,19 @@ void Widget::imgReply(QNetworkReply *reply)
         // 解析成功
         // 最外层json
         QJsonObject obj = doc.object();
+        if(obj.contains("timestamp"))
+        {
+            int tmp_timestamp = obj.take("timestamp").toInt();
+            if(tmp_timestamp < m_cur_timestamp)
+            {
+                return;
+            }
+            else
+            {
+                m_cur_timestamp = tmp_timestamp;
+            }
+
+        }
         if(obj.contains("result"))
         {
             // 人脸列表
@@ -288,30 +309,31 @@ void Widget::imgReply(QNetworkReply *reply)
     }
 
     reply->deleteLater();
-    preparePostData();
+
+    // preparePostData();
 }
 
 
-void Widget::beginFaceDetect(QByteArray postData)
+void Widget::beginFaceDetect(QByteArray postData, QThread *childThread)
 {
 
     // 另一个槽函数
     // 关闭子线程
-    m_childThread->exit();
-    m_childThread->wait();
-    // m_childThread->isFinished() ? qDebug() << "childThread finished" : qDebug() << "childThread not finished";
+    childThread->exit();
+    childThread->wait();
+    // childThread->isFinished() ? qDebug() << "childThread finished" : qDebug() << "childThread not finished";
 
     // 组装请求
-    m_url->setUrl(FACEDETECTSTR);
+    m_url->setUrl(FACE_DETECT_URL);
     m_query->addQueryItem("access_token", m_access_token);
     m_url->setQuery(*m_query);
-    // qDebug() << m_url->url();
+    qDebug() << m_url->url();
 
-    m_networkReq->setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/json"));
+    m_networkReq->setHeader(QNetworkRequest::ContentTypeHeader, QVariant(FACE_CONTENT_TYPE_HEADER));
 
     m_networkReq->setUrl(*m_url);
     m_networkReq->setSslConfiguration(m_sslConfig);
-
+    // qDebug() << "post img data...";
     m_imgManager->post(*m_networkReq, postData);
 }
 
@@ -334,7 +356,7 @@ void Widget::preparePostData()
     m_childThread->start();
 
     // 给工人发通知干活
-    emit beginWork(m_img);
+    emit beginWork(m_img, m_childThread);
 }
 
 void Widget::pickCamera(int index)
