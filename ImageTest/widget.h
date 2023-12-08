@@ -9,6 +9,8 @@
 
 #define TIME_OUT 10
 
+#define TEXTOFFSET 10
+
 #define FACEDETECTSTR "https://aip.baidubce.com/rest/2.0/face/v3/detect"
 #define TOKENSTR "https://aip.baidubce.com/oauth/2.0/token"
 
@@ -53,6 +55,10 @@
 
 #include <QPainter>
 
+#include <QCameraInfo>
+#include <QComboBox>
+
+
 #include "worker.h"
 
 const QMap<QString, QString> emo_map
@@ -90,6 +96,7 @@ public slots:
     void imgReply(QNetworkReply *reply);
     void beginFaceDetect(QByteArray postData);
     void preparePostData();
+    void pickCamera(int index);
 private:
     Ui::Widget *ui;
 
@@ -113,6 +120,11 @@ private:
     QThread *m_childThread;
 
     double m_left, m_top, m_width, m_height;
+    double m_age, m_beauty;
+    int m_mask;
+    QString m_gender;
+
+    QList<QCameraInfo> m_cameraList;
 
 
 signals:

@@ -7,6 +7,18 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
 
+    m_cameraList = QCameraInfo::availableCameras();
+    foreach (const QCameraInfo &cameraInfo, m_cameraList)
+    {
+        //qDebug() << cameraInfo.description() << cameraInfo.deviceName();
+        ui->comboBox->addItem(cameraInfo.description());
+    }
+
+    // void (QComboBox::*p_currentIndexChanged)(int) = &QComboBox::currentIndexChanged;
+    // connect(ui->comboBox, p_currentIndexChanged, this, &Widget::pickCamera);
+
+    connect(ui->comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Widget::pickCamera);
+
     // 设置摄像头功能
     m_camera = new QCamera;
     m_viewfinder = new QCameraViewfinder;
@@ -16,8 +28,10 @@ Widget::Widget(QWidget *parent)
     m_camera->setViewfinder(m_viewfinder);
 
 
+
+
     m_camera->setCaptureMode(QCamera::CaptureStillImage); // 静态图片
-    m_imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToFile);
+    m_imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToBuffer);
     m_camera->start();
 
     connect(m_imageCapture, &QCameraImageCapture::imageCaptured, this, &Widget::showCameraImage);
@@ -30,10 +44,12 @@ Widget::Widget(QWidget *parent)
     m_hLayout = new QHBoxLayout(this);
 
     m_vLayout_l = new QVBoxLayout;
+
     m_vLayout_l->addWidget(ui->label);
     m_vLayout_l->addWidget(ui->pushButton);
 
     m_vLayout_r = new QVBoxLayout;
+    m_vLayout_r->addWidget(ui->comboBox);
     m_vLayout_r->addWidget(m_viewfinder);
     m_vLayout_r->addWidget(ui->textBrowser);
 
@@ -101,6 +117,15 @@ void Widget::showCameraImage(int id, QImage preview)
     painter.setPen(Qt::red);
     painter.drawRect(m_left, m_top, m_width, m_height);
 
+    QFont font;
+    font.setPixelSize(30);
+    painter.setFont(font);
+
+    painter.drawText(m_left + m_width + TEXTOFFSET, m_top + m_top, QString("年龄：").append(QString::number(m_age)));
+    painter.drawText(m_left + m_width + TEXTOFFSET, m_top + m_top + 40, QString("性别：").append(m_gender.compare("male") ? "女" : "男"));
+    painter.drawText(m_left + m_width + TEXTOFFSET, m_top + m_top + 80, QString("口罩：").append(m_mask == 0 ? "没带口罩" : "带口罩"));
+    painter.drawText(m_left + m_width + TEXTOFFSET, m_top + m_top + 120, QString("颜值：").append(QString::number(m_beauty)));
+
     ui->label->setPixmap(QPixmap::fromImage(m_img));
 }
 
@@ -142,6 +167,7 @@ void Widget::tokenReply(QNetworkReply *reply)
     }
 
     reply->deleteLater();
+
     preparePostData();
 }
 
@@ -156,14 +182,14 @@ void Widget::imgReply(QNetworkReply *reply)
 
     // 正确应答
     QByteArray replyData = reply->readAll();
-    // qDebug()<<replyData;
+    // qDebug() << replyData;
 
     QJsonParseError jsonError;
     QJsonDocument doc = QJsonDocument::fromJson(replyData, &jsonError);
 
     if(jsonError.error == QJsonParseError::NoError)
     {
-        QString face_info;
+        QString face_info = "";
         // 解析成功
         // 最外层json
         QJsonObject obj = doc.object();
@@ -187,6 +213,7 @@ void Widget::imgReply(QNetworkReply *reply)
                     {
                         m_left = location_obj.take("left").toDouble();
                     }
+
                     if(location_obj.contains("top"))
                     {
                         m_top = location_obj.take("top").toDouble();
@@ -204,9 +231,9 @@ void Widget::imgReply(QNetworkReply *reply)
                 // 年龄
                 if(face_obj.contains("age"))
                 {
-                    double age = face_obj.take("age").toDouble();
+                    m_age = face_obj.take("age").toDouble();
 
-                    face_info.append("年龄:").append(QString::number(age)).append("\r\n");
+                    face_info.append("年龄:").append(QString::number(m_age)).append("\r\n");
                 }
 
                 // 性别
@@ -215,8 +242,8 @@ void Widget::imgReply(QNetworkReply *reply)
                     QJsonObject gender_obj = face_obj.take("gender").toObject();
                     if(gender_obj.contains("type"))
                     {
-                        QString gender = gender_obj.take("type").toString();
-                        face_info.append("性别:").append(gender).append("\r\n");
+                        m_gender = gender_obj.take("type").toString();
+                        face_info.append("性别:").append(m_gender.compare("male") ? "女" : "男").append("\r\n");
                     }
                 }
 
@@ -237,16 +264,16 @@ void Widget::imgReply(QNetworkReply *reply)
                     QJsonObject mask_obj = face_obj.take("mask").toObject();
                     if(mask_obj.contains("type"))
                     {
-                        int mask = mask_obj.take("type").toInt();
-                        face_info.append("口罩:").append(mask == 0 ? "没带口罩" : "带口罩").append("\r\n");
+                        m_mask = mask_obj.take("type").toInt();
+                        face_info.append("口罩:").append(m_mask == 0 ? "没带口罩" : "带口罩").append("\r\n");
                     }
                 }
 
                 // 颜值
                 if(face_obj.contains("beauty"))
                 {
-                    double beauty = face_obj.take("beauty").toDouble();
-                    face_info.append("颜值:").append(QString::number(beauty)).append("\r\n");
+                    m_beauty = face_obj.take("beauty").toDouble();
+                    face_info.append("颜值:").append(QString::number(m_beauty)).append("\r\n");
                 }
 
             }
@@ -271,6 +298,8 @@ void Widget::beginFaceDetect(QByteArray postData)
     // 另一个槽函数
     // 关闭子线程
     m_childThread->exit();
+    m_childThread->wait();
+    // m_childThread->isFinished() ? qDebug() << "childThread finished" : qDebug() << "childThread not finished";
 
     // 组装请求
     m_url->setUrl(FACEDETECTSTR);
@@ -306,5 +335,28 @@ void Widget::preparePostData()
 
     // 给工人发通知干活
     emit beginWork(m_img);
+}
+
+void Widget::pickCamera(int index)
+{
+    qDebug() << m_cameraList.at(index).description();
+    m_refreshTimer->stop();
+    m_camera->stop();
+
+    m_camera = new QCamera(m_cameraList.at(index));
+    m_imageCapture = new QCameraImageCapture(m_camera);
+
+    connect(m_imageCapture, &QCameraImageCapture::imageCaptured, this, &Widget::showCameraImage);
+
+
+    m_imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToBuffer);
+    m_camera->setCaptureMode(QCamera::CaptureStillImage); // 静态图片
+    m_camera->setViewfinder(m_viewfinder);
+    m_camera->start();
+
+    // m_viewfinder->show();
+    m_refreshTimer->start(TIME_OUT);
+
+
 }
 
