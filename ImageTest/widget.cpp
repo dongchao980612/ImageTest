@@ -27,9 +27,6 @@ Widget::Widget(QWidget *parent)
     m_viewfinder->show();
     m_camera->setViewfinder(m_viewfinder);
 
-
-
-
     m_camera->setCaptureMode(QCamera::CaptureStillImage); // 静态图片
     m_imageCapture->setCaptureDestination(QCameraImageCapture::CaptureToBuffer);
     m_camera->start();
@@ -70,7 +67,7 @@ Widget::Widget(QWidget *parent)
     m_netTimer = new QTimer;
     connect(m_netTimer, &QTimer::timeout, this, &Widget::preparePostData);
 
-
+    // 新建网络请求模块
     m_tokenManager = new QNetworkAccessManager(this);
     m_imgManager = new QNetworkAccessManager(this);
     qDebug() << m_tokenManager->supportedSchemes();
@@ -378,7 +375,5 @@ void Widget::pickCamera(int index)
 
     // m_viewfinder->show();
     m_refreshTimer->start(TIME_OUT);
-
-
 }
 
